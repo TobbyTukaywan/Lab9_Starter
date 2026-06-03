@@ -7,6 +7,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Lab 9</title>
 
+  <!-- TrackJS error monitoring -->
+  <script src="https://cdn.trackjs.com/agent/v3/latest/t.js"></script>
+  <script>
+    window.TrackJS && TrackJS.install({
+      token: "8c5f16ad094e499984b5358bd8a2a5fe"
+      // for more configuration options, see https://docs.trackjs.com
+    });
+  </script>
+
   <style>
     button {
       margin: 3px;
@@ -88,20 +97,103 @@
   </main>
 
   <script>
-    let form = document.querySelector('form');
+    // ---------- Custom Error type (Step 4) ----------
+    class CalculatorError extends Error {
+      constructor(message) {
+        super(message);
+        this.name = "CalculatorError";
+      }
+    }
+
+    // ---------- Calculator with try/catch/finally + throw (Steps 3 & 4) ----------
+    const form = document.querySelector('form');
     form.addEventListener('submit', e => {
       e.preventDefault();
-      let output = document.querySelector('output');
-      let firstNum = document.querySelector('#first-num').value;
-      let secondNum = document.querySelector('#second-num').value;
-      let operator = document.querySelector('#operator').value;
-      output.innerHTML = eval(`${firstNum} ${operator} ${secondNum}`);
+      const output = document.querySelector('output');
+      const firstNum = document.querySelector('#first-num').value;
+      const secondNum = document.querySelector('#second-num').value;
+      const operator = document.querySelector('#operator').value;
+
+      try {
+        if (firstNum === '' || secondNum === '') {
+          throw new CalculatorError('Both numbers are required.');
+        }
+        if (Number.isNaN(Number(firstNum)) || Number.isNaN(Number(secondNum))) {
+          throw new CalculatorError(`Inputs must be numeric (got "${firstNum}" and "${secondNum}").`);
+        }
+        if (operator === '/' && Number(secondNum) === 0) {
+          throw new CalculatorError('Cannot divide by zero.');
+        }
+        output.innerHTML = eval(`${firstNum} ${operator} ${secondNum}`);
+      } catch (err) {
+        if (err instanceof CalculatorError) {
+          console.error('[CalculatorError]', err.message);
+          output.innerHTML = `Error: ${err.message}`;
+        } else {
+          console.error('[Unexpected]', err);
+          output.innerHTML = 'Unexpected error — see console.';
+        }
+      } finally {
+        console.log(`Calculation attempted: ${firstNum} ${operator} ${secondNum}`);
+      }
     });
 
-    let errorBtns = Array.from(document.querySelectorAll('#error-btns > button'));
+    // ---------- Console-method demo buttons (Step 2) ----------
+    const errorBtns = Array.from(document.querySelectorAll('#error-btns > button'));
+    const sampleUsers = [
+      { name: 'Ada', role: 'eng' },
+      { name: 'Linus', role: 'eng' },
+      { name: 'Grace', role: 'admiral' },
+    ];
 
-    // Start your code here
-    // You may move this JS to another file if you wish
+    const handlers = {
+      'Console Log':         () => console.log('Hello from console.log — sample users:', sampleUsers),
+      'Console Error':       () => console.error('This is a console.error message (not a thrown error).'),
+      'Console Count':       () => console.count('Console Count button clicks'),
+      'Console Warn':        () => console.warn('Heads up — this is a console.warn message.'),
+      'Console Assert':      () => console.assert(1 === 2, 'Assertion failed: 1 !== 2'),
+      'Console Clear':       () => console.clear(),
+      'Console Dir':         () => console.dir(document.querySelector('form')),
+      'Console dirxml':      () => console.dirxml(document.querySelector('main')),
+      'Console Group Start': () => {
+        console.group('Demo group');
+        console.log('Inside the group');
+        console.log('Another line inside the group');
+      },
+      'Console Group End':   () => {
+        console.log('About to end the group');
+        console.groupEnd();
+      },
+      'Console Table':       () => console.table(sampleUsers),
+      'Start Timer':         () => console.time('demo-timer'),
+      'End Timer':           () => console.timeEnd('demo-timer'),
+      'Console Trace':       () => {
+        const inner = () => console.trace('Trace from inner()');
+        const outer = () => inner();
+        outer();
+      },
+      'Trigger a Global Error': () => {
+        // Uncaught reference — escapes to window.onerror (Step 5)
+        thisFunctionDoesNotExist();
+      },
+    };
+
+    errorBtns.forEach(btn => {
+      const fn = handlers[btn.textContent.trim()];
+      if (fn) btn.addEventListener('click', fn);
+    });
+
+    // ---------- Global error handler (Step 5) ----------
+    window.onerror = function (message, source, lineno, colno, error) {
+      console.log('[window.onerror] caught a global error:', { message, source, lineno, colno, error });
+      // In a real app you'd POST this to your logging endpoint, e.g.:
+      // fetch('/log', { method: 'POST', body: JSON.stringify({ message, source, lineno, colno }) });
+      return false; // let the browser keep its default behavior too
+    };
+
+    window.addEventListener('error', evt => {
+      console.log('[window.addEventListener("error")] caught:', evt.message);
+    });
   </script>
 </body>
 
